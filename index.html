@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projector</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; }
+  body { display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; }
+  #text { font-size: 6vw; text-align: center; white-space: pre-wrap; word-break: break-word; padding: 4vw; max-width: 100%; }
+</style>
+</head>
+<body>
+<div id="text"></div>
+<script>
+  // Auto-detects owner/repo from the GitHub Pages URL. Override here if needed.
+  const BRANCH = "main";
+  const host = location.hostname;
+  const OWNER = host.split(".")[0];
+  const REPO = location.pathname.split("/")[1] || host;
+  const URL_RAW = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/message.json`;
+
+  const el = document.getElementById("text");
+  async function load() {
+    try {
+      const r = await fetch(URL_RAW + "?t=" + Date.now(), { cache: "no-store" });
+      const data = await r.json();
+      if (el.textContent !== data.text) el.textContent = data.text;
+    } catch (e) { /* keep showing last text */ }
+  }
+  load();
+  setInterval(load, 30000);
+</script>
+</body>
+</html>

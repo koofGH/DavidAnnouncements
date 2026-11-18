@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projector Admin</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+  textarea, input { width: 100%; box-sizing: border-box; font: inherit; padding: .6rem; margin: .3rem 0 1rem; }
+  textarea { height: 10rem; }
+  button { font: inherit; padding: .6rem 1.2rem; cursor: pointer; }
+  #status { margin-top: 1rem; }
+</style>
+</head>
+<body>
+<h2>Projector admin</h2>
+<label>GitHub token (saved only in this browser)</label>
+<input id="token" type="password" placeholder="github_pat_...">
+<label>Text to project</label>
+<textarea id="text"></textarea>
+<button id="save">Save &amp; project</button>
+<div id="status"></div>
+<script>
+  const BRANCH = "main";
+  const host = location.hostname;
+  const OWNER = host.split(".")[0];
+  const REPO = location.pathname.split("/")[1] || host;
+  const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/message.json`;
+
+  const $ = id => document.getElementById(id);
+  const status = (m) => $("status").textContent = m;
+  $("token").value = localStorage.getItem("gh_token") || "";
+
+  const b64 = s => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+  const headers = () => ({
+    Authorization: "Bearer " + $("token").value.trim(),
+    Accept: "application/vnd.github+json"
+  });
+
+  fetch(API + "?ref=" + BRANCH + "&t=" + Date.now(), { headers: $("token").value ? headers() : {} })
+    .then(r => r.json())
+    .then(f => { $("text").value = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(f.content.replace(/\n/g, "")), c => c.charCodeAt(0)))).text; })
+    .catch(() => {});
+
+  $("save").onclick = async () => {
+    const token = $("token").value.trim();
+    if (!token) return status("Enter your token first.");
+    localStorage.setItem("gh_token", token);
+    status("Saving...");
+    try {
+      const cur = await fetch(API + "?ref=" + BRANCH, { headers: headers() });
+      if (!cur.ok) throw new Error("Could not read file (" + cur.status + "). Check token permissions.");
+      const sha = (await cur.json()).sha;
+      const body = {
+        message: "Update projected text",
+        content: b64(JSON.stringify({ text: $("text").value }, null, 2)),
+        sha, branch: BRANCH
+      };
+      const res = await fetch(API, { method: "PUT", headers: headers(), body: JSON.stringify(body) });
+      if (!res.ok) throw new Error("Save failed (" + res.status + ").");
+      status("Saved! The main page updates within about a minute or two.");
+    } catch (e) { status(e.message); }
+  };
+</script>
+</body>
+</html>
